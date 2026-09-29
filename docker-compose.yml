@@ -1,0 +1,19 @@
+services:
+  core-wms:
+    build:
+      context: .
+    # Laravel reads configuration from .env, not from the container environment
+    # (php artisan serve leaves $_ENV empty), so everything lives in .env.
+    env_file:
+      - .env
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "${CORE_WMS_FORWARD_PORT:-8100}:8000"
+
+# The Fifteen's compose network. Core WMS reaches the Agent Manager over it at
+# http://iwms:8000, so The Fifteen has to be up first.
+networks:
+  default:
+    name: the-fifteen_default
+    external: true
