@@ -3,19 +3,23 @@
 @section('heading', 'Intelligent Slotting')
 
 @section('lede')
-    Give the agent one or more items; it answers with the bins it would put the stock in,
-    best first, and why each one earned its place.
+    Select one or more products from the Core WMS and request recommended
+    warehouse locations from the Intelligent Slotting agent.
 @endsection
 
 @section('endpoint', $endpoint ?? '')
 
 @section('content')
     @php
-        $clientCode = old('clientCode', $clientCode);
         $items = old('items', $items);
     @endphp
 
-    <form class="panel" method="post" action="{{ route('slotting') }}" data-busy="Asking the agent…">
+    <form
+        class="panel"
+        method="post"
+        action="{{ route('slotting') }}"
+        data-busy="Asking the agent..."
+    >
         @csrf
 
         <div class="panel-head">
@@ -24,92 +28,192 @@
         </div>
 
         <div class="panel-body">
-            <div style="margin-bottom: 1rem;">
-                <label for="clientCode">Client code</label>
-                <input
-                    id="clientCode"
-                    name="clientCode"
-                    value="{{ $clientCode }}"
-                    aria-label="Client code"
-                    required
-                >
-            </div>
+            @if (empty($products))
+                <p class="empty">
+                    No products are available in the Core WMS product catalogue.
+                </p>
+            @else
+                <div class="scroller">
+                    <table id="items">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Client</th>
+                                <th>Category</th>
+                                <th class="num">Quantity</th>
+                                <th>UOM</th>
+                                <th>Expiry date (optional)</th>
+                                <th></th>
+                            </tr>
+                        </thead>
 
-            <div class="scroller">
-                <table id="items">
-                    <thead>
-                    <tr>
-                        <th>Item code</th>
-                        <th class="num">Quantity</th>
-                        <th>UOM</th>
-                        <th>Expiry date (optional)</th>
-                        <th></th>
-                    </tr>
-                    </thead>
+                        <tbody>
+                            @foreach ($items as $index => $item)
+                                @php
+                                    $selectedKey =
+                                        ($item['clientCode'] ?? '') . '|' .
+                                        ($item['itemCode'] ?? '') . '|' .
+                                        ($item['uom'] ?? '');
 
-                    <tbody>
-                    @foreach (array_merge($items, [[]]) as $index => $item)
-                        <tr>
-                            <td>
-                                <input
-                                    name="items[{{ $index }}][itemCode]"
-                                    value="{{ $item['itemCode'] ?? '' }}"
-                                    aria-label="Item code"
-                                >
-                            </td>
+                                    $selectedProduct = collect($products)->first(
+                                        fn ($product) =>
+                                            $product['clientCode'] === ($item['clientCode'] ?? '')
+                                            && $product['itemCode'] === ($item['itemCode'] ?? '')
+                                            && $product['uom'] === ($item['uom'] ?? '')
+                                    );
+                                @endphp
 
-                            <td>
-                                <input
-                                    name="items[{{ $index }}][quantity]"
-                                    inputmode="decimal"
-                                    value="{{ $item['quantity'] ?? '' }}"
-                                    aria-label="Quantity"
-                                >
-                            </td>
+                                <tr>
+                                    <td>
+                                        <select
+                                            class="product-select"
+                                            aria-label="Product"
+                                        >
+                                            @foreach ($products as $product)
+                                                @php
+                                                    $key =
+                                                        $product['clientCode'] . '|' .
+                                                        $product['itemCode'] . '|' .
+                                                        $product['uom'];
+                                                @endphp
 
-                            <td>
-                                <input
-                                    name="items[{{ $index }}][uom]"
-                                    value="{{ $item['uom'] ?? '' }}"
-                                    aria-label="UOM"
-                                >
-                            </td>
+                                                <option
+                                                    value="{{ $key }}"
+                                                    data-client="{{ $product['clientCode'] }}"
+                                                    data-item="{{ $product['itemCode'] }}"
+                                                    data-uom="{{ $product['uom'] }}"
+                                                    data-category="{{ $product['category'] ?? '' }}"
+                                                    @selected($key === $selectedKey)
+                                                >
+                                                    {{ $product['itemCode'] }}
+                                                    · {{ $product['uom'] }}
+                                                </option>
+                                            @endforeach
+                                        </select>
 
-                            <td>
-                                <input
-                                    type="date"
-                                    name="items[{{ $index }}][expiryDate]"
-                                    value="{{ $item['expiryDate'] ?? '' }}"
-                                    aria-label="Expiry date"
-                                >
-                            </td>
+                                        <input
+                                            type="hidden"
+                                            class="client-code"
+                                            name="items[{{ $index }}][clientCode]"
+                                            value="{{ $item['clientCode'] ?? '' }}"
+                                        >
 
-                            <td>
-                                <button
-                                    class="link remove"
-                                    type="button"
-                                    title="Remove this item"
-                                >
-                                    Remove
-                                </button>
-                            </td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
+                                        <input
+                                            type="hidden"
+                                            class="item-code"
+                                            name="items[{{ $index }}][itemCode]"
+                                            value="{{ $item['itemCode'] ?? '' }}"
+                                        >
+                                    </td>
 
-            <div class="actions">
-                <button class="primary" type="submit">
-                    Find slotting locations
-                </button>
+                                    <td class="client-display code">
+                                        {{ $item['clientCode'] ?? '—' }}
+                                    </td>
 
-                <button class="ghost" type="button" id="add-item">
-                    Add item
-                </button>
-            </div>
+                                    <td class="category-display">
+                                        {{ $selectedProduct['category'] ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        <input
+                                            name="items[{{ $index }}][quantity]"
+                                            inputmode="decimal"
+                                            value="{{ $item['quantity'] ?? '' }}"
+                                            aria-label="Quantity"
+                                            required
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <span class="uom-display code">
+                                            {{ $item['uom'] ?? '—' }}
+                                        </span>
+
+                                        <input
+                                            type="hidden"
+                                            class="uom"
+                                            name="items[{{ $index }}][uom]"
+                                            value="{{ $item['uom'] ?? '' }}"
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <input
+                                            type="date"
+                                            name="items[{{ $index }}][expiryDate]"
+                                            value="{{ $item['expiryDate'] ?? '' }}"
+                                            aria-label="Expiry date"
+                                        >
+                                    </td>
+
+                                    <td>
+                                        <button
+                                            class="link remove"
+                                            type="button"
+                                            title="Remove this item"
+                                        >
+                                            Remove
+                                        </button>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="actions">
+                    <button class="primary" type="submit">
+                        Find slotting locations
+                    </button>
+
+                    <button class="ghost" type="button" id="add-item">
+                        Add item
+                    </button>
+                </div>
+            @endif
         </div>
     </form>
+
+    @if (!empty($contract['rules']))
+        <section class="panel">
+            <div class="panel-head">
+                <span class="panel-title">
+                    Current IWMS Input Contract
+                </span>
+
+                <span class="panel-note">
+                    Retrieved from Agent Manager
+                </span>
+            </div>
+
+            <div class="panel-body">
+                <div class="scroller">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Field</th>
+                                <th>Rules</th>
+                            </tr>
+                        </thead>
+
+                        <tbody>
+                            @foreach ($contract['rules'] as $field => $rules)
+                                <tr>
+                                    <td class="code">
+                                        {{ $field }}
+                                    </td>
+
+                                    <td class="code">
+                                        {{ implode(', ', $rules) }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    @endif
 
     <section class="panel">
         <div class="panel-head">
@@ -117,9 +221,16 @@
 
             @isset($status)
                 <span class="status {{ $status === 200 ? 'is-ok' : 'is-bad' }}">
-                    <span class="status-dot" aria-hidden="true"></span>
-                    {{ $status }} {{ $status === 200 ? 'OK' : 'Error' }}
+                    <span
+                        class="status-dot"
+                        aria-hidden="true"
+                    ></span>
+
+                    {{ $status }}
+                    {{ $status === 200 ? 'OK' : 'Error' }}
+
                     <span class="status-sep">·</span>
+
                     {{ number_format($elapsed ?? 0, 2) }}s
                 </span>
             @endisset
@@ -127,54 +238,62 @@
 
         @isset($result)
             @php
-                $moduleOutputs = $result['moduleOutputs'] ?? [];
+                $locations = $result['slottingLocations'] ?? [];
+                $unallocated = $result['unallocated'] ?? [];
             @endphp
 
-            @if (!empty($moduleOutputs))
+            @if (!empty($locations))
                 <div class="scroller">
                     <table>
                         <thead>
-                        <tr>
-                            <th>Item code</th>
-                            <th>Recommended location</th>
-                            <th class="num">Score</th>
-                            <th>Status</th>
-                            <th>Reason</th>
-                        </tr>
+                            <tr>
+                                <th class="num">Rank</th>
+                                <th>Item code</th>
+                                <th>Location</th>
+                                <th class="num">Quantity</th>
+                                <th>UOM</th>
+                                <th>Reasons</th>
+                            </tr>
                         </thead>
 
                         <tbody>
-                        @foreach ($moduleOutputs as $output)
-                            <tr>
-                                <td class="code">
-                                    {{ $output['query']['sku_id'] ?? '—' }}
-                                </td>
+                            @foreach ($locations as $location)
+                                <tr>
+                                    <td class="num code">
+                                        {{ $location['rank'] ?? '—' }}
+                                    </td>
 
-                                <td>
-                                    @if (!empty($output['recommendation']['location_code']))
-                                        <x-thermal :code="$output['recommendation']['location_code']" />
-                                    @else
-                                        —
-                                    @endif
-                                </td>
+                                    <td class="code">
+                                        {{ $location['itemCode'] ?? '—' }}
+                                    </td>
 
-                                <td class="num code">
-                                    {{ isset($output['recommendation']['putaway_score'])
-                                        ? number_format($output['recommendation']['putaway_score'], 2)
-                                        : '—' }}
-                                </td>
+                                    <td>
+                                        @if (!empty($location['location']))
+                                            <x-thermal
+                                                :code="$location['location']"
+                                            />
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
 
-                                <td class="code">
-                                    {{ $output['status'] ?? '—' }}
-                                </td>
+                                    <td class="num code">
+                                        {{ $location['quantity'] ?? '—' }}
+                                    </td>
 
-                                <td>
-                                    {{ $output['short_reason']
-                                        ?? $result['reason']
-                                        ?? '—' }}
-                                </td>
-                            </tr>
-                        @endforeach
+                                    <td class="code">
+                                        {{ $location['uom'] ?? '—' }}
+                                    </td>
+
+                                    <td>
+                                        @if (!empty($location['reasons']))
+                                            {{ implode(' ', $location['reasons']) }}
+                                        @else
+                                            —
+                                        @endif
+                                    </td>
+                                </tr>
+                            @endforeach
                         </tbody>
                     </table>
                 </div>
@@ -182,6 +301,52 @@
                 <p class="empty">
                     No slotting recommendations were returned.
                 </p>
+            @endif
+
+            @if (!empty($unallocated))
+                <div class="panel-body">
+                    <strong>Unallocated items</strong>
+
+                    <div class="scroller">
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th>Client code</th>
+                                    <th>Item code</th>
+                                    <th class="num">Quantity</th>
+                                    <th>UOM</th>
+                                    <th>Reason</th>
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                @foreach ($unallocated as $item)
+                                    <tr>
+                                        <td class="code">
+                                            {{ $item['clientCode'] ?? '—' }}
+                                        </td>
+
+                                        <td class="code">
+                                            {{ $item['itemCode'] ?? '—' }}
+                                        </td>
+
+                                        <td class="num code">
+                                            {{ $item['quantity'] ?? '—' }}
+                                        </td>
+
+                                        <td class="code">
+                                            {{ $item['uom'] ?? '—' }}
+                                        </td>
+
+                                        <td>
+                                            {{ $item['reason'] ?? '—' }}
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             @endif
         @else
             <p class="empty">
@@ -191,7 +356,9 @@
 
         @isset($error)
             @if ($error)
-                <p class="empty">{{ $error }}</p>
+                <p class="empty">
+                    {{ $error }}
+                </p>
             @endif
         @endisset
     </section>
@@ -200,40 +367,107 @@
 @push('scripts')
     <script>
         const itemRows = document.querySelector('#items tbody');
+        const addItemButton = document.getElementById('add-item');
 
-        document.getElementById('add-item').addEventListener('click', () => {
-            const row = itemRows.lastElementChild.cloneNode(true);
+        function updateProduct(row) {
+            const select = row.querySelector('.product-select');
+            const option = select?.options[select.selectedIndex];
 
-            row.querySelectorAll('input').forEach((input) => {
-                input.name = input.name.replace(
-                    /\[\d+\]/,
-                    '[' + itemRows.children.length + ']'
-                );
-
-                input.value = '';
-            });
-
-            itemRows.append(row);
-            row.querySelector('input').focus();
-        });
-
-        itemRows.addEventListener('click', (event) => {
-            if (!event.target.classList.contains('remove')) {
+            if (!option) {
                 return;
             }
 
-            if (itemRows.children.length > 1) {
-                event.target.closest('tr').remove();
+            row.querySelector('.client-code').value =
+                option.dataset.client ?? '';
+
+            row.querySelector('.item-code').value =
+                option.dataset.item ?? '';
+
+            row.querySelector('.uom').value =
+                option.dataset.uom ?? '';
+
+            row.querySelector('.client-display').textContent =
+                option.dataset.client ?? '—';
+
+            row.querySelector('.uom-display').textContent =
+                option.dataset.uom ?? '—';
+
+            row.querySelector('.category-display').textContent =
+                option.dataset.category ?? '—';
+        }
+
+        function renumberRows() {
+            if (!itemRows) {
+                return;
             }
 
             [...itemRows.children].forEach((row, index) => {
-                row.querySelectorAll('input').forEach((input) => {
-                    input.name = input.name.replace(
+                row.querySelectorAll('[name]').forEach((field) => {
+                    field.name = field.name.replace(
                         /\[\d+\]/,
                         '[' + index + ']'
                     );
                 });
             });
-        });
+        }
+
+        if (itemRows) {
+            itemRows.addEventListener('change', (event) => {
+                if (
+                    !event.target.classList.contains('product-select')
+                ) {
+                    return;
+                }
+
+                updateProduct(event.target.closest('tr'));
+            });
+
+            itemRows.addEventListener('click', (event) => {
+                if (!event.target.classList.contains('remove')) {
+                    return;
+                }
+
+                if (itemRows.children.length <= 1) {
+                    return;
+                }
+
+                event.target.closest('tr').remove();
+
+                renumberRows();
+            });
+
+            [...itemRows.children].forEach((row) => {
+                updateProduct(row);
+            });
+        }
+
+        if (addItemButton && itemRows) {
+            addItemButton.addEventListener('click', () => {
+                const source = itemRows.lastElementChild;
+
+                if (!source) {
+                    return;
+                }
+
+                const row = source.cloneNode(true);
+
+                row.querySelector('.product-select').selectedIndex = 0;
+
+                row.querySelector(
+                    '[name$="[quantity]"]'
+                ).value = '1';
+
+                row.querySelector(
+                    '[name$="[expiryDate]"]'
+                ).value = '';
+
+                itemRows.append(row);
+
+                renumberRows();
+                updateProduct(row);
+
+                row.querySelector('.product-select').focus();
+            });
+        }
     </script>
 @endpush

@@ -15,5 +15,5 @@ services:
 # http://iwms:8000, so The Fifteen has to be up first.
 networks:
   default:
-    name: fyp_new_default # change if needed
+    name: the-fifteen_default # change if needed
     external: true

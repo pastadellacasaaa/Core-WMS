@@ -48,15 +48,17 @@ class AgentManagerClient
 
     private function request(): PendingRequest
     {
-        return Http::timeout((int) config('services.agent_manager.timeout'))
+        $request = Http::timeout((int) config('services.agent_manager.timeout'))
             ->withHeaders([
                 'X-Agent-Token' => (string) config('services.agent_manager.token'),
-                // The Agent Manager rejects plain HTTP when API_ENFORCE_HTTPS is on.
-                // Inside the compose network this hop stands in for the TLS-terminated
-                // one a real deployment would make, so declare it as such.
-                'X-Forwarded-Proto' => 'https',
             ])
             ->acceptJson();
+
+        if (! config('services.agent_manager.verify_ssl', true)) {
+            $request->withoutVerifying();
+        }
+
+        return $request;
     }
 
     /**

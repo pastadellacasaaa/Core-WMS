@@ -18,6 +18,7 @@ return [
         'base_url' => env('AGENT_MANAGER_BASE_URL'),
         'token' => env('AGENT_MANAGER_TOKEN', ''),
         'timeout' => env('AGENT_MANAGER_TIMEOUT', 120),
+        'verify_ssl' => env('AGENT_MANAGER_VERIFY_SSL', true),
     ],
 
     'postmark' => [
