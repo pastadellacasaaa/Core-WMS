@@ -13,7 +13,7 @@ use Illuminate\View\View;
  */
 class WavePlanningController extends Controller
 {
-    private const AGENT = 'wave-planning-and-route-optimization';
+    private const AGENT = 'wave-planning';
 
     /** Item codes and UOMs that exist in The Fifteen's seeded warehouse. */
     private const SAMPLE_ORDERS = [
