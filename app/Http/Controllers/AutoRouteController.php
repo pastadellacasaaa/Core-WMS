@@ -10,13 +10,12 @@ class AutoRouteController extends Controller
 {
     private const SAMPLES = [
         'Intelligent Slotting' => [
-            'items' => [
-                [
-                    'clientCode' => 'SCS',
-                    'itemCode' => 'FROZEN-0027',
-                    'quantity' => 5,
-                    'uom' => 'CTN',
-                ],
+            'clientCode' => 'SCS',
+            'item' => [
+                'itemCode' => 'FROZEN-0027',
+                'quantity' => 5,
+                'uom' => 'CTN',
+                'expiryDate' => '2028-06-30',
             ],
         ],
 
@@ -27,6 +26,20 @@ class AutoRouteController extends Controller
                     'clientCode' => 'SCS',
                     'itemCode' => 'FROZEN-0027',
                     'quantity' => 5,
+                    'uom' => 'CTN',
+                ],
+                [
+                    'orderNo' => 'SO-UAT-001',
+                    'clientCode' => 'SCS',
+                    'itemCode' => 'FROZEN-2126',
+                    'quantity' => 8,
+                    'uom' => 'PKT',
+                ],
+                [
+                    'orderNo' => 'SO-UAT-001',
+                    'clientCode' => 'SCS',
+                    'itemCode' => 'DRY-0211',
+                    'quantity' => 4,
                     'uom' => 'CTN',
                 ],
             ],
