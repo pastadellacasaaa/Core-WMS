@@ -16,7 +16,8 @@ return [
 
     'agent_manager' => [
         'base_url' => env('AGENT_MANAGER_BASE_URL'),
-        'token' => env('AGENT_MANAGER_TOKEN', ''),
+        'client_id' => env('AGENT_MANAGER_CLIENT_ID', ''),
+        'secret' => env('AGENT_MANAGER_SECRET', ''),
         'timeout' => env('AGENT_MANAGER_TIMEOUT', 120),
         'verify_ssl' => env('AGENT_MANAGER_VERIFY_SSL', true),
     ],

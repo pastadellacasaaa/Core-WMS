@@ -39,11 +39,16 @@ Check the Agent Manager settings in `.env`:
 
 ```dotenv
 AGENT_MANAGER_BASE_URL=http://iwms:8000/api/agent-manager
-AGENT_MANAGER_TOKEN=your-shared-agent-token
+AGENT_MANAGER_CLIENT_ID=iwms_...
+AGENT_MANAGER_SECRET=...
 AGENT_MANAGER_TIMEOUT=120
 ```
 
-`AGENT_MANAGER_TOKEN` must match the value in **The-Fifteen/iwms/.env**. If your examples contain `change-me-agent-token`, replace it with the same shared value in both projects.
+The client ID and secret are issued by The Fifteen. Run this once there and copy both values; the secret is shown only once:
+
+```bash
+docker exec the-fifteen-iwms-1 php artisan api-clients:create core-wms
+```
 
 The address above is for direct HTTP communication between containers. If your setup uses an HTTPS proxy instead, use its reachable Docker hostname and full Agent Manager URL. `localhost` inside the Core WMS container refers to Core WMS itself.
 
@@ -95,7 +100,7 @@ Use `GET /api/agent-manager` on The Fifteen to inspect the current routing contr
 
 ## How the call works
 
-`app/Services/AgentManagerClient.php` handles communication with The Fifteen and sends the shared token in the `X-Agent-Token` header.
+`app/Services/AgentManagerClient.php` handles communication with The Fifteen and signs every request with the client secret (HMAC-SHA256 over the method, path, timestamp, nonce and body hash), sent as the `X-Client-Id`, `X-Request-Timestamp`, `X-Request-Nonce` and `X-Request-Signature` headers. The secret itself never leaves Core WMS.
 
 For automatic routing, the harness posts the JSON payload to:
 
@@ -113,7 +118,7 @@ Explicit routing uses `POST {AGENT_MANAGER_BASE_URL}/{agent}`. Consult the curre
 | --- | --- |
 | Docker reports that an external network does not exist | Start The Fifteen first and compare the network name in both Compose configurations. Use `docker network ls` to inspect available networks. |
 | Connection failure or hostname resolution error | Check that both apps share the configured network and that `AGENT_MANAGER_BASE_URL` uses a reachable service hostname. |
-| `401 Unauthorized` | Check that the tokens match. Recreate the affected containers after changing environment settings. |
+| `401 Unauthorized` | Check `AGENT_MANAGER_CLIENT_ID` and `AGENT_MANAGER_SECRET` against the client issued by The Fifteen (`php artisan api-clients:list` there), and that the clocks agree within 5 minutes. Recreate the affected containers after changing environment settings. |
 | SSL certificate error | Check the HTTPS URL and certificate. For local self-signed certificates, check `AGENT_MANAGER_VERIFY_SSL=false`. |
 | `422` validation response | Check the current input contract, required fields, nested items and quantities. |
 | Module error or timeout | Check that `ai-modules` is running, inspect its logs and verify the requested data exists. |
