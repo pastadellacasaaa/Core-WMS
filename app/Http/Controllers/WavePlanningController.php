@@ -14,57 +14,162 @@ use Illuminate\View\View;
 class WavePlanningController extends Controller
 {
     private const AGENT = 'wave-planning';
-
-    /** Item codes and UOMs that exist in The Fifteen's seeded warehouse. */
+    private const SAMPLE_PICKING_LIST_ID = 'PL001';
     private const SAMPLE_ORDERS = [
-        ['orderNo' => 'SO-2001', 'clientCode' => 'SFS', 'itemCode' => 'DRY-0146', 'quantity' => '5', 'uom' => 'CTNS', 'expiryDate' => '', 'warehouseLocation' => ''],
-        ['orderNo' => 'SO-2001', 'clientCode' => 'SFS', 'itemCode' => 'DRY-0147', 'quantity' => '3', 'uom' => 'CTNS', 'expiryDate' => '', 'warehouseLocation' => ''],
-        ['orderNo' => 'SO-2002', 'clientCode' => 'SFS', 'itemCode' => 'DRY-0150', 'quantity' => '20', 'uom' => 'CTNS', 'expiryDate' => '', 'warehouseLocation' => ''],
+        [
+            'orderNo' => 'ORD001',
+            'clientCode' => 'SCS',
+            'items' => [
+                [
+                    'itemCode' => 'FROZEN-1444',
+                    'quantity' => 1,
+                    'uom' => 'CTN',
+                ],
+            ],
+        ],
+        [
+            'orderNo' => 'ORD002',
+            'clientCode' => 'SCS',
+            'items' => [
+                [
+                    'itemCode' => 'FROZEN-1045',
+                    'quantity' => 1,
+                    'uom' => 'CTN',
+                ],
+            ],
+        ],
+        [
+            'orderNo' => 'ORD003',
+            'clientCode' => 'SCS',
+            'items' => [
+                [
+                    'itemCode' => 'FROZEN-1551',
+                    'quantity' => 1,
+                    'uom' => 'CTN',
+                ],
+            ],
+        ],
+        [
+            'orderNo' => 'ORD005',
+            'clientCode' => 'SFS',
+            'items' => [
+                [
+                    'itemCode' => 'FROZEN-0338',
+                    'quantity' => 1,
+                    'uom' => 'CTN',
+                ],
+            ],
+        ],
     ];
 
     public function show(AgentManagerClient $agentManager): View
     {
         return view('wave-planning', [
+            'pickingListId' => self::SAMPLE_PICKING_LIST_ID,
+            'warehouseZone' => 'EFRZ1',
             'orders' => self::SAMPLE_ORDERS,
             'endpoint' => $agentManager->endpoint(self::AGENT),
         ]);
     }
 
-    public function plan(Request $request, AgentManagerClient $agentManager): View
-    {
-        $orders = array_values(array_filter(
-            (array) $request->input('orders', []),
-            // The form always posts its blank spare rows; they are not input.
-            static fn ($order): bool => is_array($order) && implode('', array_map('strval', $order)) !== '',
-        ));
-
-        $request->merge(['orders' => $orders])->validate([
-            'orders' => ['required', 'array', 'min:1'],
-            'orders.*.orderNo' => ['required', 'string', 'max:50'],
-            'orders.*.clientCode' => ['required', 'string', 'max:50'],
-            'orders.*.itemCode' => ['required', 'string', 'max:50'],
-            'orders.*.quantity' => ['required', 'numeric', 'gt:0'],
-            'orders.*.uom' => ['required', 'string', 'max:10'],
-            'orders.*.expiryDate' => ['nullable', 'date_format:Y-m-d'],
-            'orders.*.warehouseLocation' => ['nullable', 'string', 'max:80'],
+    public function plan(
+        Request $request,
+        AgentManagerClient $agentManager
+    ): View {
+        $validated = $request->validate([
+            'pickingListId' => [
+                'required', 'string', 'max:50',
+            ],
+            'warehouseZone' => ['required', 'string', 'max:50'],
+            'orders' => [
+                'required', 'array', 'min:1',
+            ],
+            'orders.*.orderNo' => [
+                'required', 'string', 'max:50',
+            ],
+            'orders.*.clientCode' => [
+                'required', 'string', 'max:50',
+            ],
+            'orders.*.items' => [
+                'required', 'array', 'min:1',
+            ],
+            'orders.*.items.*.itemCode' => [
+                'required', 'string', 'max:50',
+            ],
+            'orders.*.items.*.quantity' => [
+                'required', 'numeric', 'gt:0',
+            ],
+            'orders.*.items.*.uom' => [
+                'required', 'string', 'max:10',
+            ],
+            'orders.*.items.*.specificExpiryDate' => [
+                'nullable', 'date_format:Y-m-d',
+            ],
+            'orders.*.items.*.specificLocation' => [
+                'nullable', 'string', 'max:80',
+            ],
         ]);
 
+        $orders = array_map(
+            static function (array $order): array {
+                $order['items'] = array_map(
+                    static function (array $item): array {
+                        $item['quantity'] = (float) $item['quantity'];
+
+                        foreach ([
+                            'specificExpiryDate',
+                            'specificLocation',
+                        ] as $field) {
+                            if (
+                                ! isset($item[$field])
+                                || $item[$field] === ''
+                            ) {
+                                unset($item[$field]);
+                            }
+                        }
+
+                        return $item;
+                    },
+                    array_values($order['items'])
+                );
+
+                return $order;
+            },
+            array_values($validated['orders'])
+        );
+
+        $payload = [
+            'pickingListId' => $validated['pickingListId'],
+            'warehouseZone' => $validated['warehouseZone'],
+            'orders' => $orders,
+        ];
+
         $startedAt = microtime(true);
-        $response = $agentManager->run(self::AGENT, ['orders' => $orders]);
+
+        $response = $agentManager->run(
+            self::AGENT,
+            $payload
+        );
+
         $elapsed = microtime(true) - $startedAt;
 
         return view('wave-planning', [
+            'pickingListId' => $validated['pickingListId'],
+            'warehouseZone' => $validated['warehouseZone'],
             'orders' => $orders,
             'endpoint' => $agentManager->endpoint(self::AGENT),
             'status' => $response->status(),
             'elapsed' => $elapsed,
-            'result' => $response->successful() ? $response->json() : null,
+            'result' => $response->successful()
+                ? $response->json()
+                : null,
             'error' => $response->successful()
                 ? null
                 : sprintf(
                     '%s (HTTP %d)',
-                    $response->json('message') ?? 'Agent Manager request failed.',
-                    $response->status(),
+                    $response->json('message')
+                        ?? 'Agent Manager request failed.',
+                    $response->status()
                 ),
         ]);
     }

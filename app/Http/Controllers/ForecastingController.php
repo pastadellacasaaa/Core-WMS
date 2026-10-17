@@ -16,8 +16,8 @@ class ForecastingController extends Controller
 
     private const SAMPLE_QUERY = [
         'clientCode' => 'SFS',
-        'itemCode' => 'FROZEN-0050',
-        'forecastDays' => '21',
+        'itemCode' => 'DRY-0146',
+        'forecastDays' => 14,
     ];
 
     public function show(AgentManagerClient $agentManager): View

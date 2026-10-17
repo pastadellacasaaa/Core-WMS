@@ -20,34 +20,59 @@ class AutoRouteController extends Controller
         ],
 
         'Wave Planning' => [
+            'pickingListId' => 'PL001',
+            'warehouseZone' => 'EFRZ1',
             'orders' => [
                 [
-                    'orderNo' => 'SO-UAT-001',
+                    'orderNo' => 'ORD001',
                     'clientCode' => 'SCS',
-                    'itemCode' => 'FROZEN-0027',
-                    'quantity' => 5,
-                    'uom' => 'CTN',
+                    'items' => [
+                        [
+                            'itemCode' => 'FROZEN-1444',
+                            'quantity' => 1,
+                            'uom' => 'CTN',
+                        ],
+                    ],
                 ],
                 [
-                    'orderNo' => 'SO-UAT-001',
+                    'orderNo' => 'ORD002',
                     'clientCode' => 'SCS',
-                    'itemCode' => 'FROZEN-2126',
-                    'quantity' => 8,
-                    'uom' => 'PKT',
+                    'items' => [
+                        [
+                            'itemCode' => 'FROZEN-1045',
+                            'quantity' => 1,
+                            'uom' => 'CTN',
+                        ],
+                    ],
                 ],
                 [
-                    'orderNo' => 'SO-UAT-001',
+                    'orderNo' => 'ORD003',
                     'clientCode' => 'SCS',
-                    'itemCode' => 'DRY-0211',
-                    'quantity' => 4,
-                    'uom' => 'CTN',
+                    'items' => [
+                        [
+                            'itemCode' => 'FROZEN-1551',
+                            'quantity' => 1,
+                            'uom' => 'CTN',
+                        ],
+                    ],
+                ],
+                [
+                    'orderNo' => 'ORD005',
+                    'clientCode' => 'SFS',
+                    'items' => [
+                        [
+                            'itemCode' => 'FROZEN-0338',
+                            'quantity' => 1,
+                            'uom' => 'CTN',
+                        ],
+                    ],
                 ],
             ],
         ],
 
         'Demand Forecasting' => [
             'clientCode' => 'SFS',
-            'itemCode' => 'FROZEN-0050',
+            'itemCode' => 'DRY-0146',
             'forecastDays' => 14,
         ],
 
@@ -84,9 +109,13 @@ class AutoRouteController extends Controller
         $payload = json_decode($body, true);
 
         if (! is_array($payload)) {
-            return view('auto-route', $this->page($agentManager, $body) + [
-                'error' => 'That is not valid JSON: '.json_last_error_msg(),
-            ]);
+            return view(
+                'auto-route',
+                $this->page($agentManager, $body) + [
+                    'error' => 'That is not valid JSON: '
+                        .json_last_error_msg(),
+                ]
+            );
         }
 
         $startedAt = microtime(true);
@@ -133,7 +162,8 @@ class AutoRouteController extends Controller
             'payload' => $payload,
             'endpoint' => $agentManager->endpoint(),
             'samples' => array_map(
-                fn (array $sample): string => $this->pretty($sample),
+                fn (array $sample): string =>
+                    $this->pretty($sample),
                 self::SAMPLES
             ),
             'contracts' => $contracts->successful()
@@ -156,7 +186,8 @@ class AutoRouteController extends Controller
     {
         if (is_array($value)) {
             return array_map(
-                fn (mixed $item): mixed => $this->shorten($item),
+                fn (mixed $item): mixed =>
+                    $this->shorten($item),
                 $value
             );
         }
