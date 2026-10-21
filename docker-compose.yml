@@ -8,6 +8,9 @@ services:
       - .env
     volumes:
       - .:/var/www/html
+    environment:
+      PHP_CLI_SERVER_WORKERS: 4
+    command: [php, artisan, serve, '--host=0.0.0.0', '--port=8000', '--no-reload']
     ports:
       - "${CORE_WMS_FORWARD_PORT:-8100}:8000"
 

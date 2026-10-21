@@ -6,6 +6,9 @@ use App\Http\Controllers\SlottingController;
 use App\Http\Controllers\WavePlanningController;
 use Illuminate\Support\Facades\Route;
 
+Route::get('/api/inventory', \App\Http\Controllers\InventoryController::class)->name('inventory.index');
+Route::get('/inventory-check', \App\Http\Controllers\InventoryCheckController::class)->name('inventory.check');
+
 // The public test console only needs the field-based Agent Manager entry point.
 Route::get('/', [AutoRouteController::class, 'show'])->name('auto-route');
 Route::post('/', [AutoRouteController::class, 'send']);

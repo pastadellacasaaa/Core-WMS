@@ -356,6 +356,15 @@
 </header>
 
 <main>
+    <section class="panel" aria-label="Inventory simulation">
+        <div class="panel-body">
+            <strong>Inventory simulation</strong>
+            <p>Submit your normal request below. The Agent Manager retrieves inventory from the Core WMS workbook; warehouse layout and item information stay in iWMS.</p>
+            <p>Workbook: <code>{{ basename(config('inventory.snapshot_path')) }}</code></p>
+            <button type="button" id="check-inventory">Check inventory connection</button>
+            <p id="inventory-check-result" role="status" aria-live="polite">Check the connection before testing.</p>
+        </div>
+    </section>
     <div class="page-head">
         <h1>@yield('heading')</h1>
         <p class="lede">@yield('lede')</p>
@@ -384,6 +393,20 @@
 </main>
 
 <script>
+    document.getElementById('check-inventory').addEventListener('click', async function () {
+        const result = document.getElementById('inventory-check-result');
+        this.disabled = true;
+        result.textContent = 'Checking Agent Manager and reading the workbook…';
+        try {
+            const response = await fetch('/inventory-check', { headers: { Accept: 'application/json' } });
+            const data = await response.json();
+            result.textContent = data.message + (data.ready ? ` ${data.sourceRows} spreadsheet rows read; ${data.recordsOnFirstPage} inventory records${data.hasMorePages ? ' on the first page' : ''}.` : '');
+        } catch {
+            result.textContent = 'Connection check failed. Please retry.';
+        } finally {
+            this.disabled = false;
+        }
+    });
     // These calls take a few seconds. Say so, rather than looking frozen.
     document.querySelectorAll('form[data-busy]').forEach((form) => {
         form.addEventListener('submit', () => {

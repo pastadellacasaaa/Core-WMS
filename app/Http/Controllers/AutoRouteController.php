@@ -118,6 +118,7 @@ class AutoRouteController extends Controller
             );
         }
 
+        unset($payload['inventorySource']);
         $startedAt = microtime(true);
 
         $response = $agentManager->dispatch($payload);

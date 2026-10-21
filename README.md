@@ -92,8 +92,8 @@ The Agent Manager identifies the agent from the request structure:
 
 | Agent | Required top-level fields |
 | --- | --- |
-| Intelligent Slotting | `clientCode`, `items` |
-| Wave Planning and Route Optimisation | `orders` |
+| Intelligent Slotting | `clientCode`, `item` |
+| Wave Planning and Route Optimisation | `pickingListId`, `warehouseZone`, `orders` |
 | Demand Forecasting | `clientCode`, `itemCode`, `forecastDays` |
 
 Use `GET /api/agent-manager` on The Fifteen to inspect the current routing contracts. Valid input structure does not guarantee that the requested client or SKU is supported by the database or forecasting model.
@@ -154,3 +154,147 @@ docker compose exec <laravel-service-name> php artisan optimize:clear
 - Sessions and cache use the filesystem; Core WMS does not require its own database in this setup.
 - The views use Blade and inline CSS. There is no frontend build step or `npm run dev` process to start.
 - SVG location maps are rendered as images through a `data:` URI. Map content, including route paths or arrows, depends on the response produced by the installed iWMS version.
+
+## Inventory API testing with iWMS
+
+The client sends its normal Agent Manager request. iWMS retrieves current
+inventory from Core WMS through `GET /api/inventory` and returns the AI result:
+
+```text
+Core WMS UI -> iWMS Agent Manager -> Core WMS inventory API -> Excel workbook
+                         |
+                         +-> AI module -> response displayed in Core WMS
+```
+
+Client JSON is unchanged: there is no inventory source selector or filename in
+the request. Core WMS supplies current inventory only; iWMS retains its layout,
+item master, history, and models. Normal iWMS module pages retain their local
+inventory flow.
+
+### Workbook configuration
+
+Place the workbook in `storage/app/inventory/`. The current simulation uses
+`Inventory Snapshot 20260417 1625.xlsx`. Set this project's `.env` to:
+
+```dotenv
+WMS_INVENTORY_SNAPSHOT_PATH="/var/www/html/storage/app/inventory/Inventory Snapshot 20260417 1625.xlsx"
+WMS_INVENTORY_WORKSHEET=INVENTORY
+WMS_INVENTORY_API_TOKEN=<inventory bearer token>
+```
+
+The path is inside the Docker container, not a Windows host path. To rename or
+replace the workbook, update this setting to the new container path. When the
+setting is blank, the default is `storage/app/inventory/inventory.xlsx`.
+Only the configured file is read; other Excel files in the folder are not merged.
+No JSON files, location mapping file, import command, or simulation database are
+required for this Excel-backed setup.
+
+After changing `.env`, run from **Core-WMS**:
+
+```powershell
+docker compose up -d --force-recreate core-wms
+docker compose exec -T core-wms php artisan config:clear
+```
+
+Editing the contents of the active workbook does not require a restart. Save it
+before submitting another request; the API reads it again on each retrieval.
+
+### Connect iWMS
+
+In **The-Fifteen/iwms/.env**:
+
+```dotenv
+AGENT_MANAGER_INVENTORY_SOURCE=api
+```
+
+In **The-Fifteen/ai-modules/.env**:
+
+```dotenv
+CORE_WMS_INVENTORY_URL=http://core-wms:8000/api/inventory
+CORE_WMS_INVENTORY_TOKEN=<match WMS_INVENTORY_API_TOKEN>
+CORE_WMS_INVENTORY_TIMEOUT=60
+```
+
+Apply these settings from **The-Fifteen**:
+
+```powershell
+docker compose up -d --no-deps --force-recreate iwms ai-modules
+docker compose exec -T iwms php artisan config:clear
+```
+
+Both projects must join `the-fifteen_default`. Inventory tokens are independent
+of `AGENT_MANAGER_CLIENT_ID` and `AGENT_MANAGER_SECRET`, which authenticate signed
+client requests. Keep the configured four WMS PHP workers and `serve --no-reload`:
+a UI request waits for iWMS while iWMS calls Core WMS back for inventory. A single
+worker would block that callback.
+
+### Test from the browser
+
+1. Open `http://localhost:8100`.
+2. Click **Check inventory connection**. It displays the active workbook and row
+   counts, and confirms Agent Manager is configured for API inventory. A failed
+   check does not claim the connection is ready. This checks configuration and
+   workbook readability; submit a request to exercise the complete AI flow.
+3. Load a sample or enter the existing client JSON and submit it. The automatic
+   routing page chooses the agent from the input fields. Dedicated forms remain
+   available at `/slotting`, `/wave-planning`, and `/forecasting`.
+4. Inspect the response. For a controlled stock test, change an item's available
+   quantity in the active workbook, save, and repeat a forecasting request.
+   Inventory affects projected stock and reorder advice, not demand prediction.
+
+The dedicated slotting form sends one `clientCode` + `item` request per entered
+row. Wave requests use `pickingListId`, `warehouseZone`, and `orders`; the dedicated
+endpoint uses the `wave-planning-and-route-optimization` slug.
+
+API inventory failures return an error and do not fall back to iWMS stock. Wave
+planning reports inventory locations absent from iWMS's layout as unroutable.
+API waves are recommendations; they do not reserve local iWMS stock or create
+executable local waves.
+
+### Switch inventory sources later
+
+Source selection belongs to iWMS, not the Core WMS form. To use local iWMS
+inventory for external Agent Manager requests, set
+`AGENT_MANAGER_INVENTORY_SOURCE=local` in **The-Fifteen/iwms/.env**, then run from
+**The-Fifteen**:
+
+```powershell
+docker compose up -d --no-deps --force-recreate iwms
+docker compose exec -T iwms php artisan config:clear
+```
+
+Set it back to `api` and repeat to restore Core WMS inventory. Client inputs do
+not change. The Core WMS connection check reports not ready in local mode because
+it specifically verifies the Excel/API simulation. Normal iWMS module pages
+retain local inventory in both modes.
+
+### Excel columns and inventory response
+
+Required headers: `batch ID`, `SKU ID`, `uom`, `warehouse ID`,
+`available quantity`, `Location Code`, `pallet ID`, `Client ID`.
+Optional headers: `expiry`, `received date`, `status`, `on hand quantity`.
+Column order may change. Excel serial dates (1900/1904 systems) and YYYY-MM-DD
+are supported. Duplicate stock keys are combined. Held/inactive stock has zero
+available quantity while its physical quantity is retained. Without an on-hand
+column, physical stock is approximated by the available quantity column.
+Missing pallet IDs receive simulation row identifiers.
+
+The API returns all valid locations from the workbook. Location resolution
+belongs to iWMS; no layout JSON is needed in Core WMS. The endpoint accepts optional
+`clientCode` / `itemCode` filters and an opaque pagination cursor, returning
+`asOf`, `data`, and `nextCursor`. The page size is 5,000 inventory records.
+Missing/invalid snapshots return HTTP 503, invalid cursors 422, changed snapshots
+or filters during pagination 409, and invalid inventory tokens 401.
+`X-WMS-Inventory-Source: xlsx` identifies Excel responses. Source/skipped row
+counts are also returned in response headers. Inventory responses are not cached.
+
+Excel files are local simulation data and remain Git-ignored. Copy the workbook
+separately when setting up another developer; do not commit operational inventory.
+This simulator reads Excel directly, rather than populating the separate database
+schema suggested as an alternative simulation approach.
+
+Run the focused UI/API checks from **Core-WMS**:
+
+```powershell
+docker compose exec -T core-wms php artisan test --filter="InventoryApiTest|ExcelInventoryApiTest|InventoryCheckTest|InventorySourceFormsTest"
+```

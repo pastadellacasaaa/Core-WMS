@@ -57,10 +57,24 @@ class SlottingController extends Controller
 
         $startedAt = microtime(true);
 
-        $response = $agentManager->run(
-            self::AGENT,
-            $validated
-        );
+        $locations = [];
+        $unallocated = [];
+        foreach ($validated['items'] as $item) {
+            $clientCode = $item['clientCode'];
+            unset($item['clientCode']);
+            $item['quantity'] = (float) $item['quantity'];
+            if (empty($item['expiryDate'])) {
+                unset($item['expiryDate']);
+            }
+            $payload = ['clientCode' => $clientCode, 'item' => $item];
+
+            $response = $agentManager->run(self::AGENT, $payload);
+            if (! $response->successful()) {
+                break;
+            }
+            $locations = [...$locations, ...($response->json('slottingLocations') ?? [])];
+            $unallocated = [...$unallocated, ...($response->json('unallocated') ?? [])];
+        }
 
         $elapsed = microtime(true) - $startedAt;
 
@@ -72,7 +86,7 @@ class SlottingController extends Controller
             'status' => $response->status(),
             'elapsed' => $elapsed,
             'result' => $response->successful()
-                ? $response->json()
+                ? ['slottingLocations' => $locations, 'unallocated' => $unallocated]
                 : null,
             'error' => $response->successful()
                 ? null

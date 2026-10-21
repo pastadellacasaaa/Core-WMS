@@ -1,0 +1,1 @@
+{{-- Inventory source is configured on the iWMS server. --}}

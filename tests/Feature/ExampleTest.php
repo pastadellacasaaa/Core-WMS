@@ -21,10 +21,11 @@ class ExampleTest extends TestCase
 
         $response
             ->assertStatus(200)
-            ->assertSee('Auto-route')
-            ->assertSee('FROZEN-1361')
-            ->assertSee('2029-02-01')
-            ->assertSee('EFRZ2-A-13-04')
+            ->assertSee('Automatic Routing Request')
+            ->assertSee('FROZEN-1444')
+            ->assertSee('Inventory simulation')
+            ->assertSee('Check inventory connection')
+            ->assertDontSee('name="inventorySource"', false)
             ->assertDontSee('class="tabs"', false);
     }
 }

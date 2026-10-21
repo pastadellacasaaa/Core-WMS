@@ -21,7 +21,7 @@ class WavePlanningControllerTest extends TestCase
         Http::preventStrayRequests();
 
         Http::fake([
-            'http://agent.test/wave-planning' => Http::response([
+            'http://agent.test/wave-planning-and-route-optimization' => Http::response([
                 'agent' => 'wave-planning-and-route-optimization',
                 'status' => 'Success',
                 'processedAt' => '2026-09-10T12:00:00+08:00',
@@ -110,7 +110,7 @@ class WavePlanningControllerTest extends TestCase
 
         Http::assertSent(
             fn (ClientRequest $request): bool =>
-                $request->url() === 'http://agent.test/wave-planning'
+                $request->url() === 'http://agent.test/wave-planning-and-route-optimization'
                 && $request->data()['pickingListId'] === 'PL001'
                 && $request->data()['warehouseZone'] === 'AFRZ1'
                 && count($request->data()['orders']) === 2

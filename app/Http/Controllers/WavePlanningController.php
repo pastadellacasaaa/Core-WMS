@@ -13,7 +13,7 @@ use Illuminate\View\View;
  */
 class WavePlanningController extends Controller
 {
-    private const AGENT = 'wave-planning';
+    private const AGENT = 'wave-planning-and-route-optimization';
     private const SAMPLE_PICKING_LIST_ID = 'PL001';
     private const SAMPLE_ORDERS = [
         [
