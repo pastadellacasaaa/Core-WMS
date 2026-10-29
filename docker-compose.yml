@@ -8,6 +8,9 @@ services:
       - .env
     volumes:
       - .:/var/www/html
+      # Keep PHP dependencies on Linux storage; Windows bind-mounted vendor
+      # files add seconds of framework startup to every API request.
+      - core-wms-vendor:/var/www/html/vendor
     environment:
       PHP_CLI_SERVER_WORKERS: 4
     command: [php, artisan, serve, '--host=0.0.0.0', '--port=8000', '--no-reload']
@@ -20,3 +23,7 @@ networks:
   default:
     name: the-fifteen_default # change if needed
     external: true
+
+volumes:
+  core-wms-vendor:
+    name: core-wms-vendor

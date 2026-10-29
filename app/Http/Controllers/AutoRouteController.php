@@ -10,11 +10,11 @@ class AutoRouteController extends Controller
 {
     private const SAMPLES = [
         'Intelligent Slotting' => [
-            'clientCode' => 'SCS',
+            'clientCode' => 'SFS',
             'item' => [
-                'itemCode' => 'FROZEN-0027',
-                'quantity' => 5,
-                'uom' => 'CTN',
+                'itemCode' => 'DRY-0493',
+                'quantity' => 20,
+                'uom' => 'TIN',
                 'expiryDate' => '2028-06-30',
             ],
         ],
@@ -72,8 +72,8 @@ class AutoRouteController extends Controller
 
         'Demand Forecasting' => [
             'clientCode' => 'SFS',
-            'itemCode' => 'DRY-0146',
-            'forecastDays' => 14,
+            'itemCode' => 'CHILLED-0206',
+            'forecastDays' => 30,
         ],
 
         'Missing Required Fields' => [
